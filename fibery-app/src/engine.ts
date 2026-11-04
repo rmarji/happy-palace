@@ -37,7 +37,10 @@ const DEMO={live:false,
     {Name:"Example: Income sprint",Area:"Career",Score:38,Off:2,Goal:"Example: Income landed",Metrics:[{Name:"Example: applications per week",Status:"Off",Att:20,Val:1,Target:5,Trend:"▼"},{Name:"Example: conversations per week",Status:"At risk",Att:80,Val:4,Target:5,Trend:"▲"},{Name:"Example: interview loops",Status:"On track",Att:100,Val:2,Target:2,Trend:"▬"}]},
     {Name:"Example: Ship Gate",Area:"Telling",Score:100,Off:0,Metrics:[{Name:"Example: tells per week",Status:"On track",Att:100,Val:1,Target:1,Trend:"▬"}]},
     {Name:"Example: Revenue health",Area:"Revenue",Score:62,Off:1,Metrics:[{Name:"Example: proposals per week",Status:"At risk",Att:50,Val:1,Target:2,Trend:"▬"},{Name:"Example: pipeline value",Status:"On track",Att:100,Val:12,Target:10,Trend:"▲"}]}],
-  agents:[],ideas:[{Name:"Example: a game world for my agents"},{Name:"Example: a podcast"},{Name:"Example: a pottery class"}],doneWeek:3
+  agents:[{Name:"Example: Scout",Class:"Bot",Platform:"Example cloud",Quota:62,Resets:new Date(Date.now()+5*36e5).toISOString(),Checked:new Date().toISOString()},{Name:"Example: Scribe",Class:"Bot",Platform:"Example cloud",Quota:62},{Name:"Example: Watchdog",Class:"Bot",Platform:"Example server"},{Name:"Example: Bookkeeper",Class:"Bot",Platform:"Example cloud",Quota:15,Resets:new Date(Date.now()+30*36e5).toISOString(),Checked:new Date().toISOString()}],
+  agentTasks:[{Delegate:"Example: Scribe",Name:"Example: Draft the newsletter",Proj:"Example: Weekly newsletter"}],
+  runs:[{By:"Example: Scribe",Name:"Example run",Note:"Outlining three angles. Leaning on the reader question from last week.",Started:new Date().toISOString(),Proj:"Example: Weekly newsletter"}],
+  ideas:[{Name:"Example: a game world for my agents"},{Name:"Example: a podcast"},{Name:"Example: a pottery class"}],doneWeek:3
 };
 
 /* ---------- payload parsing ---------- */
@@ -302,7 +305,7 @@ function buildScenery(R){
 function buildWorld(data){
   scene.remove(world);world.traverse(o=>{if(o.geometry)o.geometry.dispose();});
   world=new THREE.Group();scene.add(world);interactables=[];rooms=[];spinners=[];bobbers=[];lamps=[];gearSpin=[];clouds=[];pulsers=[];
-  const SC={};(data.scorecards||[]).forEach(c=>{if(c.Area)SC[c.Area]=c;});
+  const SC={};(data.scorecards||[]).forEach(c=>{if(c.Area)SC[c.Area]=c;});computeLevels(data);projPos={};
   /* focus: the three projects holding the highest-ranked open missions (Fibery Execution Score order) */
   FOCUS={};OVERDUE={};focusList=[];const today=new Date(new Date().toDateString());
   (data.missions||[]).forEach((m,i)=>{if(!m.Project)return;if(m.Due&&new Date(String(m.Due).slice(0,10))<today)OVERDUE[m.Project]=(OVERDUE[m.Project]||0)+1;
@@ -322,7 +325,9 @@ function buildWorld(data){
   for(let i=0;i<n;i++){const ang=-Math.PI/2+(i+.5-(n-1)/2)*(2*Math.PI/n);[[0,1],[3.5,.8],[-3.5,.9]].forEach(([dr,sz],k)=>treeAt(world,Math.cos(ang)*(R+dr)+(k?Math.sin(ang)*2:0),Math.sin(ang)*(R+dr),sz,[0x5fb35a,0x7cc76a,0xf2a7c3][(i+k)%3]));}
   for(let k=0;k<14;k++){const a=k/14*Math.PI*2+.11;const r=33+(k%3)*2;if(Math.abs(Math.cos(a))<.15)continue;treeAt(world,Math.cos(a)*r,Math.sin(a)*r,.75,k%4?0x7cc76a:0xf6c46a);}
   for(let k=0;k<10;k++){const a=k/10*Math.PI*2+.3;lamp(Math.cos(a)*24,Math.sin(a)*24);}
-  applySky();drawMini();renderFocus();
+  buildAgents(data);
+  if(mode==="inside"){savedInteract=interactables;interactables=interior&&interior.inter?interior.inter:[];world.visible=false;}
+  applySky();drawMini();renderFocus();setLevelHUD();
 }
 
 /* Throne Room: a rose-sandstone facade, the Chief, MAX THREE pillars, and the mission board */
@@ -370,10 +375,14 @@ function buildRoom(a,cx,cz,ang,G,R,sc){
   const rim=new THREE.Mesh(new THREE.BoxGeometry(W+.8,.2,D+.8),new THREE.MeshStandardMaterial({color:tint,roughness:.6}));rim.position.y=.1;g.add(rim);
   const topY=LANDMARK[theme](g,W,-D/2-1.2,tint);
   [[-1,1],[1,1]].forEach(([sx,sz])=>{add(g,rbox(1,1.4,1,.2),mat(0xf6ead8),sx*W/2,.7,sz*D/2);add(g,new THREE.SphereGeometry(.55,14,10),mat(tint,{roughness:.4}),sx*W/2,1.8,sz*D/2);});
-  const nl=label(title,{size:2.1});nl.position.set(0,topY+(sc?4.6:2),-D/2);g.add(nl);
+  const alv=(LV.area[a.name]||{lv:1}).lv;const nl=label(`${title} · Lv ${alv}`,{size:2.1});nl.position.set(0,topY+(sc?4.6:2),-D/2);g.add(nl);
   const sub=attic?"no Life Area yet":[THEME_NAME[theme],a.slot==="none"?"":a.slot,sc?`score ${sc.Score??"–"}`:""].filter(Boolean).join(" · ");
   if(sub){const sl=label(sub,{size:.9,font:"700 48px 'Atkinson Hyperlegible', sans-serif",ink:"#5f5568"});sl.position.set(0,topY+(sc?3.4:.8),-D/2);g.add(sl);}
   if(sc)buildScorecard(g,sc,W,D,topY);
+  for(let i=0;i<Math.min(alv,5);i++){const st=add(g,new THREE.OctahedronGeometry(.42,0),new THREE.MeshStandardMaterial({color:0xffd36a,emissive:0xffb000,emissiveIntensity:.9}),(i-(Math.min(alv,5)-1)/2)*1.2,topY+(sc?6:3.3),-D/2,false);spinners.push(st);}
+  /* wing gate pad: walk onto it and press Enter to go inside the wing */
+  const gate=add(g,new THREE.CylinderGeometry(1.5,1.5,.14,28),new THREE.MeshStandardMaterial({color:tint,emissive:tint,emissiveIntensity:.35,roughness:.4}),0,.08,D/2+2.6,false);pulsers.push({o:gate,s:1,amp:.04,sp:2});
+  const gw=new THREE.Vector3();gate.getWorldPosition(gw);
   /* pennants across the entrance */
   g.updateMatrixWorld(true);
   const pa=new THREE.Vector3(-W/2,0,D/2).applyMatrix4(g.matrixWorld),pb=new THREE.Vector3(W/2,0,D/2).applyMatrix4(g.matrixWorld);pennantString(pa,pb,5);
@@ -403,10 +412,12 @@ function buildRoom(a,cx,cz,ang,G,R,sc){
     else{const ring=new THREE.Mesh(new THREE.RingGeometry(.4,.56,24),new THREE.MeshBasicMaterial({color:0xd2554b,side:THREE.DoubleSide}));ring.rotation.x=-Math.PI/2;ring.position.set(1.5,.03,.4);pd.add(ring);}
     const short=String(p.Name).length>30?String(p.Name).slice(0,28)+"…":String(p.Name);
     const lb=label((fx?`Focus ${fx} · `:"")+short+(od?` · ${od} overdue`:""),{size:fx?.95:.6,font:"700 50px 'Atkinson Hyperlegible', sans-serif",bg:fx?"rgba(255,214,106,.95)":quiet?"rgba(255,250,240,.6)":undefined,ink:quiet?"#8a8094":"#2a2233"});lb.position.y=1.2+cr*2+(fx?1.4:.9);pd.add(lb);
-    const wp=new THREE.Vector3();pd.getWorldPosition(wp);if(fx)focusList[fx-1].pos=wp.clone();
+    const wp=new THREE.Vector3();pd.getWorldPosition(wp);if(fx)focusList[fx-1].pos=wp.clone();projPos[p.Name]=wp.clone();
+    const pms=LV.projMs[p.Name]||0;for(let k=0;k<Math.min(pms,6);k++){const rg=new THREE.Mesh(new THREE.TorusGeometry((fx?1.32:1.02)-k*.04,.06,6,28),M.gold);rg.rotation.x=Math.PI/2;rg.position.y=.95+k*.13;pd.add(rg);}
     interactables.push({mesh:crystal,pos:wp,radius:2.6,kind:"project",data:p,room:title,slot:G[p.Goal]||null,lead});
   });
-  rooms.push({name:title,x:cx,z:cz,size:Math.max(W,D),tint,score:sc?sc.Score:null});
+  const roomRec={name:title,area:a.name,theme,x:cx,z:cz,size:Math.max(W,D),tint,score:sc?sc.Score:null,sc,lv:alv};rooms.push(roomRec);
+  interactables.push({mesh:gate,pos:gw,radius:2.4,kind:"wing",data:roomRec,projects:a.projects});
 }
 
 /* Idea Fountain (Ideation): one floating orb per open idea */
@@ -443,6 +454,143 @@ function buildSignpost(){
   interactables.push({mesh:post,pos:new THREE.Vector3(0,0,32),radius:3,kind:"sign"});
 }
 
+/* ---------- levels ---------- */
+let LV={player:{lv:1,xp:0,cur:0,next:100},area:{},projMs:{}};
+function lvOf(xp,k){const L=Math.max(1,Math.floor((1+Math.sqrt(1+4*xp/k))/2));return {lv:L,xp,cur:k*L*(L-1),next:k*(L+1)*L};}
+function hashN(s){let h=0;for(const c of String(s))h=(h*31+c.charCodeAt(0))>>>0;return h;}
+function computeLevels(data){const areaXP={},projMs={};let px=0;
+  if(data.live){(data.doneAll||[]).forEach(r=>{px+=10;if(r.Area)areaXP[r.Area]=(areaXP[r.Area]||0)+10;});
+    (data.msDone||[]).forEach(r=>{px+=50;if(r.Area)areaXP[r.Area]=(areaXP[r.Area]||0)+50;if(r.Proj)projMs[r.Proj]=(projMs[r.Proj]||0)+1;});}
+  else{px=460;(data.projects||[]).forEach(p=>{const a=p.Area||"__attic";areaXP[a]=(areaXP[a]||0)+40+hashN(p.Name)%120;projMs[p.Name]=hashN(p.Name)%4;});}
+  const area={};Object.keys(areaXP).forEach(a=>{area[a]=lvOf(areaXP[a],25);});
+  LV={player:lvOf(px,50),area,projMs};}
+
+/* ---------- agents in the world ---------- */
+let projPos={},agentMeshes=[];
+function trunc(s,n){s=String(s||"").replace(/\s+/g," ").trim();return s.length>n?s.slice(0,n-1)+"…":s;}
+function quotaText(a){if(!a)return "quota not reported";const p=num(a.Quota);let t=p==null?"quota not reported":`${p}% left`;
+  if(a.Resets){const d=new Date(a.Resets),h=(d-Date.now())/36e5;t+=h>0?` · resets ${h<24?`in ${Math.max(1,Math.round(h))}h`:d.toLocaleDateString([],{timeZone:CONFIG_TZ(),month:"short",day:"numeric"})}`:" · reset passed";}
+  if(p!=null&&a.Checked&&(Date.now()-new Date(a.Checked))>12*36e5)t+=" (stale)";return t;}
+function CONFIG_TZ(){return typeof CONFIG!=="undefined"?CONFIG.timeZone:CONFIG.timeZone;}
+function agentStatus(data){const ag={};(data.agents||[]).forEach(a=>{if(a.Class==="Human")return;ag[a.Name]={...a,Quota:a.Quota,working:null};});
+  (data.agentTasks||[]).forEach(t=>{if(!t.Delegate)return;const a=ag[t.Delegate]||(ag[t.Delegate]={Name:t.Delegate});a.working={task:t.Name,taskId:t.Id,project:t.Proj,thought:null};});
+  (data.runs||[]).forEach(r=>{if(!r.By)return;const fresh=!r.Started||(Date.now()-new Date(r.Started))<12*36e5;const a=ag[r.By]||(ag[r.By]={Name:r.By});
+    if(fresh){a.working=a.working||{task:r.Task||r.Name,project:r.Proj||(a.Projects&&a.Projects[0]&&a.Projects[0].Name)||null};a.working.thought=a.working.thought||r.Note||r.Name;}
+    else if(!a.working){a.handoff=r.Note||r.Name;}});
+  return ag;}
+function bubble(text,{size=.5,bg="rgba(255,255,255,.96)",ink="#2a2233"}={}){return label(text,{size,bg,ink,font:"600 44px 'Atkinson Hyperlegible', sans-serif",maxW:1400});}
+function buildAgents(data){agentMeshes=[];const AG=agentStatus(data);const list=Object.values(AG);
+  const working=list.filter(a=>a.working),idle=list.filter(a=>!a.working);let k=0;
+  const perProj={};
+  working.forEach(a=>{const pos=projPos[a.working.project];const n=(perProj[a.working.project]=(perProj[a.working.project]||0)+1);
+    let x,z;if(pos){const ang=n*1.25+.6;x=pos.x+Math.cos(ang)*2.4;z=pos.z+Math.sin(ang)*2.4;}else{const ang=Math.PI*.5+(k++)*.25;x=Math.cos(ang)*27;z=Math.sin(ang)*27;}
+    const g=figure(0x2ab7a9,.85);g.position.set(x,pos?.35:0,z);if(pos)g.lookAt(pos.x,g.position.y,pos.z);world.add(g);bobbers.push({o:g,base:g.position.y,ph:k+n,amp:.06});
+    const nm=label(a.Name,{size:.42,font:"800 48px 'Bricolage Grotesque', sans-serif",bg:"rgba(42,183,169,.95)",ink:"#fff"});nm.position.set(x,(pos?.35:0)+2.75,z);world.add(nm);
+    const th=bubble("💭 "+trunc(a.working.thought||("Working on: "+a.working.task),64));th.position.set(x,(pos?.35:0)+3.55,z);world.add(th);
+    const it={mesh:g.children[0],pos:new THREE.Vector3(x,0,z),radius:1.8,kind:"agent",data:a};interactables.push(it);agentMeshes.push({a,th,x,z,y:(pos?.35:0)+3.55});});
+  /* agent lodge behind the throne: idle agents with their quota */
+  const n=idle.length;if(n){const rows=n>14?2:1,per=Math.ceil(n/rows);
+    const pad=new THREE.Mesh(new THREE.RingGeometry(17.5,25.5,48,1,Math.PI*1.08,Math.PI*.84),new THREE.MeshStandardMaterial({color:0xefe4f6,roughness:.9,side:THREE.DoubleSide}));pad.rotation.x=-Math.PI/2;pad.position.y=.03;pad.receiveShadow=true;world.add(pad);
+    const sg=label(`Agent Lodge · ${n} idle`,{size:1.1});sg.position.set(0,5.6,-21.5);world.add(sg);
+    idle.forEach((a,i)=>{const row=Math.floor(i/per),j=i%per;const ang=Math.PI*1.12+(per>1?j/(per-1):.5)*Math.PI*.76;const r=row?24:19.5;const x=Math.cos(ang)*r,z=Math.sin(ang)*r;
+      const col=[0x8a5cd6,0x3d86e0,0xd9826a,0xf2a93b,0x34d39a][hashN(a.Platform||a.Name)%5];const g=figure(col,.65);g.position.set(x,0,z);g.lookAt(0,0,0);world.add(g);
+      const q=quotaText(a);const lb=bubble(`${trunc(a.Name,22)} · ${q}`,{size:.36,bg:"rgba(255,250,240,.92)"});lb.position.set(x,2.2+(i%2)*.35,z);world.add(lb);
+      interactables.push({mesh:g.children[0],pos:new THREE.Vector3(x,0,z),radius:1.4,kind:"agent",data:a});});}
+  const al=document.getElementById("agentsLine");if(al)al.textContent=`Agents: ${working.length} working · ${idle.length} idle in the Lodge`;
+  /* fill thoughts from the latest comment on the task, where the backend can */
+  agentMeshes.forEach(m=>{if(m.a.working&&m.a.working.taskId&&!m.a.working.fromRun&&typeof lastComment==="function"){lastComment(m.a.working.taskId).then(t=>{if(!t)return;m.a.working.thought=t;world.remove(m.th);const nb=bubble("💭 "+trunc(t,64));nb.position.set(m.x,m.y,m.z);world.add(nb);m.th=nb;}).catch(()=>{});}});
+}
+
+/* ---------- zone panel: inside a wing, inside a project ---------- */
+let mode="world",zoneArea=null,savedPos=null,interior=null,savedInteract=null;
+const zone=document.getElementById("zone"),zoneBody=document.getElementById("zoneBody"),zoneTitle=document.getElementById("zoneTitle"),zoneEyebrow=document.getElementById("zoneEyebrow");
+function openZone(eyebrow,title,html){zoneEyebrow.textContent=eyebrow;zoneTitle.textContent=title;zoneBody.innerHTML=html;zone.classList.add("on");document.body.classList.add("zoning");}
+function closeZone(){zone.classList.remove("on");document.body.classList.remove("zoning");}
+const MS_COL={"Done":0xf2b84b,"In Progress":0x3d86e0,"Blocked":0xd2554b,"Not Started":0xb8aec4};
+async function enterArea(room){mode="area";zoneArea=room;travel={x:room.x,z:room.z};camTween={yaw,pitch:1.05,dist:36};
+  const lv=LV.area[room.area]||{lv:1};const sc=room.sc;
+  openZone(`Wing · Level ${lv.lv}`,room.name,`<p class="sub">Loading projects…</p>`);
+  let rows=null;if(state.data.live&&room.area!=="__attic"){try{rows=await fetchRows("area",room.area);}catch(e){rows=null;}}
+  if(!rows||!rows.length)rows=(state.data.projects||[]).filter(p=>(p.Area||"__attic")===room.area);
+  room.detail=rows;
+  zoneBody.innerHTML=(sc?`<p><strong>Scorecard:</strong> ${esc(sc.Name)} · ${sc.Score??"–"}/100${sc.Off?` · ${sc.Off} off`:""}</p>`:"")+
+    `<p class="sub">Level ${lv.lv} · ${lv.xp} XP${lv.next?` · ${lv.next-lv.xp} to level ${lv.lv+1}`:""}. Finish tasks and milestones here to level the wing up.</p>`+
+    rows.map((p,i)=>{const ms=p.Milestones||[];const msd=ms.filter(m=>m.State==="Done").length;const dec=(p.Decisions||[]).filter(d=>d.State==="Open"||d.State==="Revisit").length;
+      return `<div class="zp"><div class="zn">${FOCUS[p.Name]?`<span class="fx">${FOCUS[p.Name]}</span> `:""}${esc(p.Name)}</div>
+      <div class="zm">${esc(p.State||"")}${p.Open!=null?` · ${p.Open} open`:""}${p.Score!=null?` · score ${p.Score}`:""}${p.Since!=null?` · ${Math.round(Number(p.Since))}d since last done`:""}${OVERDUE[p.Name]?` · <span class="od">${OVERDUE[p.Name]} overdue</span>`:""}</div>
+      ${ms.length?`<div class="zbar" title="${msd} of ${ms.length} milestones"><i style="width:${Math.round(msd/ms.length*100)}%"></i></div><div class="zm">${msd}/${ms.length} milestones${dec?` · ${dec} open decisions`:""}${(p.Subs||[]).length?` · ${p.Subs.length} subprojects`:""}</div>`:""}
+      ${p.Next?`<div class="zm">Next: ${esc(trunc(p.Next,120))}</div>`:""}
+      <div class="qa"><button data-zact="inside" data-zi="${i}">Step inside</button>${p.url?`<a href="${esc(p.url)}" target="_blank" rel="noopener">Open</a>`:""}</div></div>`;}).join("")+
+    `<p class="sub">Esc or ✕ to leave the wing.</p>`;}
+function leaveArea(){mode="world";zoneArea=null;closeZone();camTween={yaw,pitch:VIEWS[1].pitch,dist:VIEWS[1].dist};}
+zone.addEventListener("click",e=>{const b=e.target.closest("button[data-zact]");if(!b)return;
+  if(b.dataset.zact==="inside"&&zoneArea){const p=zoneArea.detail[+b.dataset.zi];if(p)enterProject(p);}
+  if(b.dataset.zact==="sub"&&interior){const s=interior.detail&&interior.detail.Subs&&interior.detail.Subs[+b.dataset.zi];if(s)enterProject(s);}});
+document.getElementById("zoneClose").addEventListener("click",()=>{if(mode==="inside")leaveProject();else if(mode==="area")leaveArea();});
+
+function signTex(title,body,w=640,h=400){const c=document.createElement("canvas");c.width=w;c.height=h;const g=c.getContext("2d");g.fillStyle="#fffaf0";g.fillRect(0,0,w,h);
+  g.fillStyle="#2a2233";g.font="800 40px sans-serif";g.fillText(trunc(title,26),28,58);g.font="400 25px sans-serif";g.fillStyle="#3d3447";
+  const words=String(body||"").replace(/\s+/g," ").split(" ");let line="",y=104;for(const wd of words){const t=line?line+" "+wd:wd;if(g.measureText(t).width>w-56){g.fillText(line,28,y);line=wd;y+=34;if(y>h-24)break;}else line=t;}if(y<=h-24&&line)g.fillText(line,28,y);
+  const tx=new THREE.CanvasTexture(c);tx.encoding=THREE.sRGBEncoding;return tx;}
+async function enterProject(p){let d=null;
+  if(state.data.live&&p.Id){try{d=(await fetchRows("project",p.Id))[0]||null;}catch(e){d=null;}}
+  if(!d){const ms=(state.data.missions||[]).filter(m=>m.Project===p.Name);d={Name:p.Name,Snip:p.Next?("Next action: "+p.Next):"Example project. Live data shows its milestones, tasks, decisions and subprojects here.",
+    Milestones:state.data.live?[]:[{Name:"Example: first milestone",State:"Done"},{Name:"Example: second milestone",State:"In Progress"},{Name:"Example: launch",State:"Not Started"}],
+    Tasks:ms.map(m=>({Name:m.Name,State:m.State,Delegate:m.Delegate})),Decisions:state.data.live?[]:[{Name:"Example: build or buy?",State:"Open"}],Subs:[],Agents:p.Agents||[]};}
+  if(mode!=="inside"){savedPos=player.position.clone();savedInteract=interactables;}
+  if(interior){scene.remove(interior.g);}
+  mode="inside";world.visible=false;interactables=[];travel=null;
+  const g=new THREE.Group();scene.add(g);interior={g,detail:d,name:p.Name};
+  const room=rooms.find(r=>r.area===(p.Area||zoneArea&&zoneArea.area))||zoneArea||{tint:0xf2a93b,theme:"pavilion"};
+  const fc=new THREE.Color(THEME_FLOOR[room.theme||"pavilion"]);const ft=tileTex("#"+fc.getHexString(),"#"+fc.clone().multiplyScalar(.9).getHexString(),4);ft.repeat.set(8,8);
+  add(g,new THREE.CircleGeometry(21,64),new THREE.MeshStandardMaterial({map:ft,roughness:.9}),0,.02,0,false).rotation.x=-Math.PI/2;
+  add(g,new THREE.CylinderGeometry(21,21,1.4,64,1,true),new THREE.MeshStandardMaterial({color:room.tint||0xf2a93b,roughness:.7,side:THREE.DoubleSide}),0,.7,0,false);
+  /* heart of the project */
+  const msd=(d.Milestones||[]).filter(m=>m.State==="Done").length;
+  add(g,rbox(2.6,1,2.6,.3),M.gold,0,.5,0);const cr=add(g,new THREE.OctahedronGeometry(1.3,0),new THREE.MeshStandardMaterial({color:0xffd36a,emissive:0xffa020,emissiveIntensity:.8,flatShading:true}),0,2.6,0);spinners.push(cr);
+  const t1=label(`${p.Name} · Lv ${msd+1}`,{size:1.3});t1.position.set(0,5,0);g.add(t1);
+  /* description sign at the entrance */
+  const sign=add(g,new THREE.PlaneGeometry(6.4,4),new THREE.MeshStandardMaterial({map:signTex("About",d.Snip||"No description yet.")}),-6,3.2,15,false);sign.lookAt(0,3.2,30);
+  /* milestones: a path of pillars across the front */
+  const ms=(d.Milestones||[]).filter(m=>m.State!=="Dropped");ms.forEach((m,i)=>{const t=ms.length>1?i/(ms.length-1):.5;const ang=Math.PI*1.15+t*Math.PI*.7;const x=Math.cos(ang)*13,z=Math.sin(ang)*13;
+    const col=MS_COL[m.State]||0xb8aec4;add(g,rbox(1.1,m.State==="Done"?3:2.2,1.1,.2),mat(0xf6ead8),x,m.State==="Done"?1.5:1.1,z);
+    const orb=add(g,new THREE.SphereGeometry(.55,18,12),new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:m.State==="Done"?.8:m.State==="In Progress"?.5:.05}),x,(m.State==="Done"?3:2.2)+.7,z,false);if(m.State==="In Progress")pulsers.push({o:orb,s:1,amp:.15,sp:4});
+    const lb=label(`${m.State==="Done"?"✓ ":m.State==="In Progress"?"▶ ":""}${trunc(m.Name,34)}${m.Target?` · ${String(m.Target).slice(5,10)}`:""}`,{size:.55,font:"700 46px 'Atkinson Hyperlegible', sans-serif"});lb.position.set(x,(m.State==="Done"?3:2.2)+1.7,z);g.add(lb);
+    if(i>0){const pt=ms.length>1?(i-1)/(ms.length-1):.5,pa=Math.PI*1.15+pt*Math.PI*.7;const px=Math.cos(pa)*13,pz=Math.sin(pa)*13;const len=Math.hypot(x-px,z-pz);const st=add(g,new THREE.BoxGeometry(.5,.06,len),mat(m.State==="Done"||ms[i-1].State==="Done"?0xf6d58a:0xe2d2b2),(x+px)/2,.05,(z+pz)/2,false);st.lookAt(x,.05,z);}});
+  if(!ms.length){const lb=label("No milestones yet",{size:.7,ink:"#8a8094"});lb.position.set(0,2,-13);g.add(lb);}
+  /* task boards at the back-right: Todo / In Progress / Done */
+  const tasks=d.Tasks||[];[["Todo",0xf2a93b],["In Progress",0x3d86e0],["Done",0x34d39a]].forEach(([st,col],bi)=>{const bx=8+bi*0, ang=Math.PI*(.1+bi*.13);const x=Math.cos(ang)*15,z=Math.sin(ang)*15;
+    const b=new THREE.Group();b.position.set(x,0,z);b.lookAt(0,0,0);g.add(b);add(b,rbox(4.4,3.6,.25,.08),mat(0xf3e2c0),0,2.4,0);add(b,rbox(4.6,.35,.35,.1),mat(col),0,4.35,0);
+    const items=tasks.filter(tk=>st==="Todo"?(tk.State!=="Done"&&tk.State!=="In Progress"&&tk.State!=="Dropped"):tk.State===st).slice(0,6);
+    const tl=label(`${st} · ${tasks.filter(tk=>st==="Todo"?(tk.State!=="Done"&&tk.State!=="In Progress"&&tk.State!=="Dropped"):tk.State===st).length}`,{size:.5,bg:"rgba(255,255,255,.95)"});tl.position.set(0,4.9,.2);b.add(tl);
+    items.forEach((tk,j)=>{const l=label(trunc(tk.Name,30)+(tk.Delegate?` · ${trunc(tk.Delegate,12)}`:""),{size:.34,font:"600 44px sans-serif",bg:"rgba(255,255,255,.92)"});l.position.set(0,3.85-j*.52,.25);b.add(l);});
+    interactables.push({mesh:b.children[0],pos:new THREE.Vector3(x,0,z),radius:3.2,kind:"tboard",data:{st,items:tasks.filter(tk=>st==="Todo"?(tk.State!=="Done"&&tk.State!=="In Progress"&&tk.State!=="Dropped"):tk.State===st)}});});
+  /* decisions: lecterns on the back-left */
+  (d.Decisions||[]).slice(0,6).forEach((dc,i)=>{const ang=Math.PI*(.62+i*.07);const x=Math.cos(ang)*15,z=Math.sin(ang)*15;const col=dc.State==="Decided"?0x34d39a:dc.State==="Open"||dc.State==="Revisit"?0xf2a93b:0xb8aec4;
+    add(g,new THREE.CylinderGeometry(.18,.25,1.4,8),M.wood,x,.7,z);const top=add(g,rbox(1,.12,.8,.05),mat(col),x,1.45,z);top.rotation.x=-.4;const l=label(trunc(dc.Name,30)+` · ${dc.State}`,{size:.38,font:"600 44px sans-serif"});l.position.set(x,2.3,z);g.add(l);});
+  /* subprojects: doors on the left */
+  (d.Subs||[]).slice(0,6).forEach((s,i)=>{const ang=Math.PI*(.85+i*.06);const x=Math.cos(ang)*19,z=Math.sin(ang)*19;const dr=new THREE.Group();dr.position.set(x,0,z);dr.lookAt(0,0,0);g.add(dr);
+    add(dr,new THREE.TorusGeometry(1.1,.18,8,20,Math.PI),mat(room.tint||0xf2a93b),0,2,0);[-1.1,1.1].forEach(xx=>add(dr,new THREE.BoxGeometry(.36,2,.36),mat(room.tint||0xf2a93b),xx,1,0));
+    const l=label(`${trunc(s.Name,26)}${s.Open!=null?` · ${s.Open} open`:""}`,{size:.4,font:"600 44px sans-serif"});l.position.set(0,3.6,0);dr.add(l);
+    interactables.push({mesh:dr.children[0],pos:new THREE.Vector3(x,0,z),radius:2.4,kind:"subdoor",data:s});});
+  /* agents on this project */
+  (d.Agents||[]).slice(0,5).forEach((a,i)=>{const f=figure(0x2ab7a9,.8);f.position.set(-2.8+i*1.4,0,3.2);g.add(f);const l=label(a.Name,{size:.36,bg:"rgba(42,183,169,.95)",ink:"#fff"});l.position.set(-2.8+i*1.4,2.4,3.2);g.add(l);});
+  /* exit portal */
+  const ex=add(g,new THREE.TorusGeometry(1.8,.25,10,28,Math.PI),new THREE.MeshStandardMaterial({color:0xffffff,emissive:0x8ad8ff,emissiveIntensity:.8}),0,0,19.6,false);const el=label("Exit (Esc)",{size:.6});el.position.set(0,2.6,19.6);g.add(el);
+  interactables.push({mesh:ex,pos:new THREE.Vector3(0,0,19.4),radius:2.2,kind:"exit"});interior.inter=interactables;
+  player.position.set(0,0,16);pup.position.set(1.5,0,17);yaw=0;camTween={yaw:0,pitch:.62,dist:16};current=null;
+  openZone(`Inside · ${room.name||"Project"}`,p.Name,
+    (d.Snip?`<p>${esc(trunc(d.Snip,420))}</p>`:"")+
+    `<p><strong>Milestones</strong> (${msd}/${ms.length} done)</p>${ms.length?`<ul>${ms.map(m=>`<li>${m.State==="Done"?"✓":m.State==="In Progress"?"▶":"○"} ${esc(m.Name)}${m.Target?` · ${esc(String(m.Target).slice(0,10))}`:""}</li>`).join("")}</ul>`:`<p class="sub">None yet. Milestones are how a project levels up.</p>`}`+
+    `<p><strong>Tasks</strong> · ${tasks.filter(t=>t.State!=="Done"&&t.State!=="Dropped").length} open</p><ul>${tasks.filter(t=>t.State!=="Done"&&t.State!=="Dropped").slice(0,10).map(t=>`<li>${t.State==="In Progress"?"▶ ":""}${esc(t.Name)}${t.Delegate?` · <em>${esc(t.Delegate)}</em>`:""}</li>`).join("")}</ul>`+
+    ((d.Decisions||[]).length?`<p><strong>Decisions</strong></p><ul>${d.Decisions.map(x=>`<li>${esc(x.Name)} · ${esc(x.State)}</li>`).join("")}</ul>`:"")+
+    ((d.Subs||[]).length?`<p><strong>Subprojects</strong></p>${d.Subs.map((s,i)=>`<div class="qa" style="margin:3px 0"><button data-zact="sub" data-zi="${i}">Step into ${esc(trunc(s.Name,30))}</button><span class="sub">${s.Open!=null?s.Open+" open":""}</span></div>`).join("")}`:"")+
+    ((d.Agents||[]).length?`<p><strong>Agents:</strong> ${d.Agents.map(a=>esc(a.Name)).join(", ")}</p>`:"")+
+    (d.url||p.url?`<p><a href="${esc(d.url||p.url)}" target="_blank" rel="noopener">Open in Fibery</a></p>`:"")+`<p class="sub">Esc or the portal to leave.</p>`);}
+function leaveProject(){if(interior){scene.remove(interior.g);interior=null;}world.visible=true;interactables=savedInteract||interactables;mode=zoneArea?"area":"world";
+  if(savedPos)player.position.copy(savedPos);current=null;if(zoneArea)enterArea(zoneArea);else{closeZone();camTween={yaw,pitch:VIEWS[1].pitch,dist:VIEWS[1].dist};}}
+
+try{if(/[?&]debug/.test(location.search))window.__hp={enterProject:(...x)=>enterProject(...x),enterArea:(...x)=>enterArea(...x),leaveProject:()=>leaveProject(),get state(){return state},get rooms(){return rooms}};}catch(e){}
 /* ---------- focus panel and guide trail ---------- */
 const trail=[];{const tm=new THREE.MeshStandardMaterial({color:0xffd36a,emissive:0xffb000,emissiveIntensity:.9});for(let i=0;i<28;i++){const d=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),tm);d.visible=false;scene.add(d);trail.push(d);}}
 function renderFocus(){const panel=document.getElementById("focusPanel"),ol=document.getElementById("focusList");if(!panel)return;
@@ -473,6 +621,8 @@ addEventListener("keydown",e=>{const k=e.key.toLowerCase();
   if(e.target&&(e.target.tagName==="SELECT"||e.target.tagName==="INPUT"))return;
   if(["arrowup","arrowdown","arrowleft","arrowright"," "].includes(k)&&document.activeElement===canvas)e.preventDefault();
   if(!e.repeat&&k==="v"){viewIx=(viewIx+1)%VIEWS.length;const v=VIEWS[viewIx];camTween={yaw,pitch:v.pitch,dist:v.dist};toast(`${v.name} view`);}
+  if(!e.repeat&&k==="enter"&&document.activeElement===canvas||(!e.repeat&&k==="enter"&&document.activeElement===document.body)){doEnter();}
+  if(!e.repeat&&k==="escape"){if(mode==="inside")leaveProject();else if(mode==="area")leaveArea();}
   if(!e.repeat&&k==="g"&&focusList.length){guideIx=(guideIx+1)%focusList.length;renderFocus();toast(`Guide: ${focusList[guideIx].name}`);}
   if(!e.repeat&&k==="h"){camTween={yaw:0,pitch:VIEWS[1].pitch,dist:VIEWS[1].dist};}
   keys[k]=true;if(k==="m")toggleDrawer();});
@@ -512,7 +662,8 @@ function showCard(it){
         <div class="qn">${i===0?"▶ ":""}${esc(m.Name)}</div>
         <div class="qd">${esc(m.State||"Todo")}${m.Priority?" · "+esc(m.Priority):""}${m.Due?` · <span style="color:${od?"var(--alarm)":"inherit"}">due ${esc(String(m.Due).slice(0,10))}</span>`:""}${m.Delegate?" · with "+esc(m.Delegate):""}${m.Blocked?' · <span style="color:var(--alarm)">blocked</span>':""}</div>
         <div class="qa"><button class="sprint" data-qact="sprint">25-min sprint</button><button class="done" data-qact="done" ${D.live?"":"disabled"}>Done</button>${m.State!=="In Progress"?`<button data-qact="start" ${D.live?"":"disabled"}>Start</button>`:""}${D.live&&agentOpts?`<select data-qact="agent" aria-label="Hand to an agent"><option value="">Hand to agent…</option>${agentOpts}</select>`:""}${m.url?`<a href="${esc(m.url)}" target="_blank" rel="noopener">Open</a>`:""}</div></div>`;}).join(""):`<p>No open missions here. Add a Task to this project in Fibery to give it a quest.</p>`)+
-      (ms.length?`<p class="qd" style="margin-top:4px">Finish the ▶ mission to clear the quest. ${D.live?"":"Example data: buttons are off."}</p>`:"");
+      (ms.length?`<p class="qd" style="margin-top:4px">Finish the ▶ mission to clear the quest. ${D.live?"":"Example data: buttons are off."}</p>`:"")+
+      `<p style="margin-top:6px"><button class="hudbtn" data-enter="project">Step inside the project</button> <span class="qd">or press Enter</span></p>`;
     if(p.url){link.href=p.url;link.hidden=false;}
   } else if(it.kind==="goal"){const gl=it.data;eb.textContent="Throne Room"+tag;t.textContent=gl.Name;
     pills.innerHTML=`<span class="${slotClass(gl.MAX)}">${esc(gl.MAX)}</span>`+(gl.Target?`<span class="pill">Target ${esc(gl.Target)}</span>`:"");
@@ -528,6 +679,17 @@ function showCard(it){
     const ms=(sc.Metrics||[]).filter(m=>m.Status!=="Parked");
     body.innerHTML=ms.length?`<ul>${ms.map(m=>`<li><strong style="color:${STATUS_COL[m.Status]||"inherit"}">${esc(m.Status)}</strong> · ${esc(m.Name)}: ${fmtNum(m.Val)}${m.Target!=null?` of ${fmtNum(m.Target)}`:""}${m.Unit?" "+esc(m.Unit):""} ${esc(m.Trend&&m.Trend!=="—"?m.Trend:"")}</li>`).join("")}</ul>`:`<p>No live metrics on this scorecard yet.</p>`;
     if(sc.url){link.href=sc.url;link.hidden=false;}
+  } else if(it.kind==="agent"){const a=it.data;eb.textContent=`Agent${a.Platform?" · "+a.Platform:""}`+tag;t.textContent=a.Name;
+    pills.innerHTML=a.working?`<span class="pill good">Working</span>${a.working.project?`<span class="pill">${esc(a.working.project)}</span>`:""}`:`<span class="pill">Idle</span><span class="pill">${esc(quotaText(a))}</span>`;
+    body.innerHTML=a.working?`<p><strong>On:</strong> ${esc(a.working.task||"")}</p>${a.working.thought?`<p>💭 ${esc(trunc(a.working.thought,420))}</p>`:""}`:`<p>Not working on a task right now.</p>${a.handoff?`<p><strong>Last handoff:</strong> ${esc(trunc(a.handoff,320))}</p>`:""}<p class="sub">Quota comes from its platform's Quota fields in Fibery, reported by the agents.</p>`;
+  } else if(it.kind==="wing"){const r=it.data;const lv=LV.area[r.area]||{lv:1,xp:0,next:50};eb.textContent=`Wing · ${THEME_NAME[r.theme]||""}`+tag;t.textContent=r.name;
+    pills.innerHTML=`<span class="pill slot1">Level ${lv.lv}</span><span class="pill">${it.projects.length} projects</span>${r.sc?`<span class="pill ${r.sc.Score>=70?"good":r.sc.Score<40?"warn":""}">Score ${r.sc.Score??"–"}</span>`:""}`;
+    body.innerHTML=`<p>${lv.xp} XP · ${Math.max(0,lv.next-lv.xp)} XP to level ${lv.lv+1}. Tasks are worth 10 XP, milestones 50.</p><p><button class="hudbtn primary" data-enter="wing">Enter wing</button> or press <kbd>Enter</kbd></p>`;
+  } else if(it.kind==="tboard"){eb.textContent="Task board";t.textContent=`${it.data.st} · ${it.data.items.length}`;pills.innerHTML="";
+    body.innerHTML=it.data.items.length?`<ul>${it.data.items.slice(0,12).map(x=>`<li>${esc(x.Name)}${x.Delegate?` · <em>${esc(x.Delegate)}</em>`:""}</li>`).join("")}</ul>`:`<p>Nothing here.</p>`;
+  } else if(it.kind==="subdoor"){eb.textContent="Subproject";t.textContent=it.data.Name;pills.innerHTML=it.data.Open!=null?`<span class="pill">${it.data.Open} open</span>`:"";
+    body.innerHTML=`<p><button class="hudbtn primary" data-enter="sub">Step through</button> or press <kbd>Enter</kbd></p>`;
+  } else if(it.kind==="exit"){eb.textContent="Portal";t.textContent="Back to the palace";pills.innerHTML="";body.innerHTML=`<p><button class="hudbtn primary" data-enter="exit">Leave</button> or press <kbd>Esc</kbd></p>`;
   } else if(it.kind==="board"){eb.textContent="Throne Room"+tag;t.textContent="Mission Board";pills.innerHTML=`<span class="pill">${(D.missions||[]).length} open missions</span>`;
     body.innerHTML=`<p>Press <kbd>M</kbd> or the Missions button to open the board. Finish a mission, start it, or hand it to an agent.</p>`;
   } else if(it.kind==="ideas"){const ideas=it.data||[];eb.textContent="Courtyard"+tag;t.textContent="Idea Fountain";
@@ -576,6 +738,8 @@ async function write(el,tool,input,okMsg){
   catch(err){el.disabled=false;const c=err&&err.code;
     toast(c==="approval_required"?"Fibery asked for your OK. Press the button again to allow it.":c==="needs_reauth"?"Reconnect Fibery in claude.ai Settings → Connectors.":c==="not_in_manifest"?"Writing to Fibery is turned off for this page.":c==="tool_error"?"Fibery refused that change: "+String(err.message||"").slice(0,120):"That change may not have saved. Check Fibery before trying again.",true);}
 }
+card.addEventListener("click",e=>{const en=e.target.closest("button[data-enter]");if(en){doEnter();return;}});
+function doEnter(){const it=current;if(!it)return;if(it.kind==="wing")enterArea(it.data);else if(it.kind==="project")enterProject(it.data);else if(it.kind==="subdoor")enterProject(it.data);else if(it.kind==="exit")leaveProject();}
 card.addEventListener("click",e=>{const b=e.target.closest("button[data-qact]");if(!b)return;const row=b.closest(".qm");const m=(state.data.missions||[]).find(x=>String(x.Id)===row.dataset.mid)||null;if(!m&&b.dataset.qact!=="sprint")return;
   const nm=m?m.Name:row.querySelector(".qn").textContent.replace("▶ ","");
   if(b.dataset.qact==="sprint"){startSprint(nm);if(m&&m.State!=="In Progress"&&state.data.live)write(b,"set_state",{database:"Personal OS/Task",entityId:m.Id,state:"In Progress"},`Sprint started: ${nm}`);return;}
@@ -625,7 +789,7 @@ function step(){
   if(fx||fz){travel=null;moving=true;const l=Math.hypot(fx,fz)||1,m=Math.min(1,l);fx/=l;fz/=l;const dx=Math.cos(yaw)*fx+Math.sin(yaw)*fz,dz=-Math.sin(yaw)*fx+Math.cos(yaw)*fz;
     player.position.x+=dx*speed*m*dt;player.position.z+=dz*speed*m*dt;player.rotation.y=Math.atan2(dx,dz);}
   else if(travel){const dx=travel.x-player.position.x,dz=travel.z-player.position.z,d=Math.hypot(dx,dz);if(d<.4)travel=null;else{moving=true;const v=Math.min(d,32*dt);player.position.x+=dx/d*v;player.position.z+=dz/d*v;player.rotation.y=Math.atan2(dx,dz);}}
-  const lim=ringRadius+12,pr=Math.hypot(player.position.x,player.position.z);if(pr>lim){player.position.x*=lim/pr;player.position.z*=lim/pr;}
+  const lim=mode==="inside"?19:ringRadius+12,pr=Math.hypot(player.position.x,player.position.z);if(pr>lim){player.position.x*=lim/pr;player.position.z*=lim/pr;}
   const ty=pr<12.5?.9:0;player.position.y+=(ty-player.position.y)*.2;
   if(moving&&!reduceMotion)player.children[0].position.y=1+Math.abs(Math.sin(t*12))*.12;
   /* pup trots behind */
@@ -639,7 +803,8 @@ function step(){
   lamps.forEach((l,i)=>{const on=l.base;if(l.beam){l.glow.material.opacity=.04+on*.16;return;}if(l.pl)l.pl.intensity=on*(1.3+(reduceMotion?0:Math.sin(t*7+i)*.1));if(l.glow&&l.glow.material.emissiveIntensity!==undefined)l.glow.material.emissiveIntensity=.2+on*1.6;});
   for(let i=confetti.length-1;i>=0;i--){const c=confetti[i];c.v.y-=12*dt;c.m.position.addScaledVector(c.v,dt);c.m.rotation.x+=dt*6;c.m.rotation.z+=dt*4;c.life-=dt;if(c.life<=0){scene.remove(c.m);c.m.geometry.dispose();confetti.splice(i,1);}}
   let near=null,nd=1e9;for(const it of interactables){const d=Math.hypot(it.pos.x-player.position.x,it.pos.z-player.position.z);if(d<it.radius&&d<nd){nd=d;near=it;}}showCard(near);
-  miniT+=dt;if(miniT>.1){miniT=0;drawMini();let rn="Courtyard";for(const r of rooms){if(Math.hypot(r.x-player.position.x,r.z-player.position.z)<r.size/2+2){rn=r.name;break;}}roomName.textContent=rn;}
+  miniT+=dt;if(miniT>.1&&mode==="inside"){miniT=0;roomName.textContent="Inside: "+(interior?trunc(interior.name,26):"");}
+  else if(miniT>.1){miniT=0;drawMini();let rn="Courtyard";for(const r of rooms){if(Math.hypot(r.x-player.position.x,r.z-player.position.z)<r.size/2+2){rn=r.name;break;}}roomName.textContent=rn;}
   skyT+=dt;if(skyT>30){skyT=0;applySky();}
   renderer.render(scene,camera);requestAnimationFrame(step);
 }
@@ -647,7 +812,12 @@ function step(){
 /* ---------- data ---------- */
 const srcDot=$("srcDot"),srcLabel=$("srcLabel"),msg=$("statusMsg"),allowBtn=$("allowBtn"),refreshBtn=$("refreshBtn");
 function setSource(kind,text,note){srcDot.className="dot "+kind;srcLabel.textContent=text;if(note){msg.textContent=note;msg.hidden=false;}else msg.hidden=true;}
-function setXP(done){const xp=done*10;$("xp").hidden=false;$("xpNum").textContent=xp;$("xpLabel").textContent=state.data.live?"Week XP":"Example XP";$("xpfill").style.width=Math.min(100,xp/300*100)+"%";}
+let lastLv=null;try{lastLv=+localStorage.getItem("hp.level")||null;}catch(e){}
+function setLevelHUD(){const P=LV.player;$("xp").hidden=false;$("lvlBadge").textContent=P.lv;$("xpLabel").textContent=state.data.live?`Level ${P.lv}`:`Example level ${P.lv}`;
+  $("xpNum").textContent=`${P.xp}/${P.next}`;$("xpfill").style.width=Math.min(100,(P.xp-P.cur)/Math.max(1,P.next-P.cur)*100)+"%";
+  $("xp").title=`${P.xp} XP all time · this week +${(state.data.doneWeek||0)*10} · tasks 10 XP, milestones 50 XP`;
+  if(state.data.live){if(lastLv&&P.lv>lastLv){toast(`Level up! You reached level ${P.lv}`);celebrate();}lastLv=P.lv;try{localStorage.setItem("hp.level",String(P.lv));}catch(e){}}}
+function setXP(){setLevelHUD();}
 
 buildWorld(DEMO);setXP(DEMO.doneWeek);requestAnimationFrame(step);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{buildWorld(state.data);current=null;});

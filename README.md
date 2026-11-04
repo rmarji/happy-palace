@@ -17,6 +17,9 @@ The world answers three questions at a glance: **where should I be, how healthy 
 - **Focus**: the three projects holding your highest-ranked open tasks glow gold, carry a floating "!" marker and a light beam, and get a gold trail on the ground that leads you there. A "Focus now" panel lists them.
 - **Quest card**: walk up to a project to see its open missions with **25-min sprint**, **Done**, **Start**, **Hand to agent** and **Open**.
 - **Scorecards**: a sign at each wing's entrance, a green/amber/red beam above the landmark, metric columns sized by attainment, and flowers that grow with the score.
+- **Levels**: you level up from finished tasks (10 XP) and milestones (50 XP). Each wing has its own level shown as stars, and each project gets a gold ring per milestone done.
+- **Live agents**: agents working on a task stand at that project with their latest note or comment as a thought bubble. Idle agents wait in the Agent Lodge behind the throne with their plan's quota and next reset.
+- **Step inside**: stand on a wing's gate pad and press `Enter` to see every project in it (milestones, open decisions, subprojects). Step into a project to walk among its milestones, task boards, decisions, subproject doors and agents. `Esc` leaves.
 - **Time of day**: sky, sun, lamps and HUD follow the clock in your time zone.
 - **Throne room** with your top goals, a Mission Board, an Idea Fountain, a Ship Gate that lights up when you announce something, and a pet that follows you.
 
@@ -26,7 +29,7 @@ The world answers three questions at a glance: **where should I be, how healthy 
 
 Open `demo/index.html` in a browser. It shows an "Example realm" with made-up data.
 
-Controls: `W A S D` walk, `Shift` run, drag to turn, scroll to zoom. `Q`/`E` turn, `R`/`F` tilt, `Z`/`X` zoom, `V` cycles Close/Follow/Aerial views, `H` resets the camera, `G` next focus project, `M` Mission Board. Click a pedestal or the minimap to travel. Click the world first so it receives key presses.
+Controls: `W A S D` walk, `Shift` run, drag to turn, scroll to zoom. `Q`/`E` turn, `R`/`F` tilt, `Z`/`X` zoom, `V` cycles Close/Follow/Aerial views, `H` resets the camera, `G` next focus project, `Enter` step inside a wing or project, `Esc` leave, `M` Mission Board. Click a pedestal or the minimap to travel. Click the world first so it receives key presses.
 
 Edit the `CONFIG` block at the top of the script for your time zone, city name and the places on the signpost.
 

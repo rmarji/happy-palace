@@ -98,6 +98,22 @@ kbd{font-family:var(--body);font-size:11px;border:1px solid var(--line);border-b
 #card ul{margin:0 0 8px;padding-left:18px}
 #card a,.mission a{color:var(--sky);font-size:13px;font-weight:700;text-decoration:none}
 #card a:hover,.mission a:hover{text-decoration:underline}
+#zone{position:fixed;z-index:7;top:calc(12px + env(safe-area-inset-top,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));left:max(12px,env(safe-area-inset-left,0px));width:min(420px,calc(100vw - 24px));display:flex;flex-direction:column;transform:translateX(-110%);transition:transform .25s}
+#zone.on{transform:none}
+#zone header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:14px 16px 6px}
+#zone h2{font-family:var(--display);font-weight:800;font-size:23px;line-height:1.1;margin:2px 0 0}
+#zoneBody{flex:1;overflow:auto;padding:0 16px 14px;font-size:14px;line-height:1.45}
+#zoneBody ul{margin:0 0 8px;padding-left:18px}#zoneBody p{margin:0 0 8px}
+#zoneBody .sub{color:var(--ink-soft);font-size:12.5px}
+#zoneBody a{color:var(--sky);font-weight:700;font-size:13px;text-decoration:none}
+.zp{border:1px solid var(--line);border-radius:12px;padding:9px 11px;margin:0 0 8px;display:flex;flex-direction:column;gap:5px}
+.zp .zn{font-weight:700;line-height:1.3}.zp .zm{font-size:12px;color:var(--ink-soft)}.zp .od{color:var(--alarm);font-weight:700}
+.zp .fx{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--sun);color:#2a2233;font-weight:800;font-size:11px}
+.zbar{height:7px;border-radius:999px;background:var(--line);overflow:hidden}.zbar i{display:block;height:100%;background:linear-gradient(90deg,var(--mint),var(--sun))}
+#zone .qa{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#zone .qa button{font-size:12px;font-weight:700;border-radius:8px;padding:5px 10px;border:1px solid var(--sun);background:var(--sun);color:#2a2233;cursor:pointer}
+body.zoning #tl,body.zoning #bl{display:none}
+#lvlBadge{display:inline-grid;place-items:center;min-width:26px;height:26px;padding:0 6px;border-radius:999px;background:var(--sun);color:#2a2233;font-weight:800;font-size:13px}
 #drawer{position:fixed;z-index:7;top:calc(12px + env(safe-area-inset-top,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));right:max(12px,env(safe-area-inset-right,0px));width:min(420px,calc(100vw - 24px));display:flex;flex-direction:column;transform:translateX(110%);transition:transform .25s}
 #drawer.on{transform:none}
 #drawer header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px 8px}

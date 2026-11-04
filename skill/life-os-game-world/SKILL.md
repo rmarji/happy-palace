@@ -66,6 +66,13 @@ Walking up to a project opens a card with up to 6 open tasks, the top one marked
 - After any write: refresh data and rebuild the world so focus re-ranks.
 - Be honest in the UI: the world is a launcher, the real work happens elsewhere.
 
+## 4b. Levels, live agents, and going inside
+
+- **Levels**: player XP = 10 per task done + 50 per milestone done; level L needs 50·L·(L−1) XP. Wings level the same way from their own area's work (25·L·(L−1)), shown as stars over the landmark. Projects show one gold ring per milestone done. Celebrate a level-up once (remember the last level in localStorage).
+- **Live agents**: an agent is *working* when a task delegated to it is In Progress, or it has a run/log entry marked Working in the last 12 hours. Stand it next to that project's pedestal with its latest note (or the task's newest comment) as a thought bubble. Everyone else waits in an "Agent Lodge" with their platform's quota left and next reset. Quota must be reported by the agents into fields on the platform record; never estimate it. Write the protocol into the agents' own instructions.
+- **Inside a wing**: a gate pad at each wing entrance; Enter opens a side panel with every project in the area (state, open tasks, score, days since last done, milestone progress bar, open decisions, subprojects) and flies the camera over the wing.
+- **Inside a project**: hide the world and build a round room: the project crystal in the middle, milestones as a path of pillars (gold done, pulsing blue in progress), three task boards (Todo / In Progress / Done), decision lecterns, subproject doors you can step through, assigned agents, a description sign, and an exit portal. Esc leaves.
+
 ## 5. Build
 
 **Stack**: Three.js r128 (cdnjs UMD build works in artifacts; npm `three@0.128.0` in Vite apps). One engine file + one data adapter + HUD markup + CSS. Keep the engine framework-free so the same source deploys anywhere; generate the variants from one source with a small script (see `tools/build_fibery_app.py`).
