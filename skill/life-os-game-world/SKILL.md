@@ -7,6 +7,8 @@ description: Build a walkable 3D game world (memory palace) over someone's perso
 
 Turn a person's goals, projects, tasks and metrics into a small 3D world they walk through: each life area is a themed building, each project a glowing pedestal, the most important work is marked like a game quest, and missions can be completed from inside the world. Reference implementation: the Happy Palace repo this skill ships in (`demo/index.html` is a working engine with example data; `fibery-app/` is the Fibery custom app version). Start from it rather than from scratch.
 
+The idea behind the name "Happy Palace": a memory palace (remember by placing things in rooms you walk through) that is also a happy place (somewhere you want to return). Keep both halves: spatial, stable placement so things are easy to find, and a bright, personal world so opening it feels good.
+
 The point is not decoration. The world must answer three questions at a glance: **where should I be, how healthy is each area, and what do I do next.** If a feature doesn't serve one of those, skip it.
 
 ## 0. Before building

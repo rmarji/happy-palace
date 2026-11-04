@@ -1,6 +1,8 @@
 # Happy Palace
 
-A walkable 3D world over your personal operating system. Life areas become themed buildings, projects become glowing pedestals, your most important work is marked like a game quest, and you can finish missions from inside the world.
+A walkable 3D world over your personal operating system.
+
+The name is a play on two ideas: a **memory palace**, the old technique of remembering things by placing them in rooms you walk through, and a **happy place**, somewhere you actually want to go back to. Your goals, projects and missions get a place in a world you enjoy visiting, so you remember where everything is and look forward to opening it. Life areas become themed buildings, projects become glowing pedestals, your most important work is marked like a game quest, and you can finish missions from inside the world.
 
 Built on Three.js r128. The demo runs from one HTML file with example data. The same engine runs as a [Fibery](https://fibery.io) custom app reading your live workspace, or as a Claude artifact reading a Fibery connector.
 
