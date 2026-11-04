@@ -37,9 +37,13 @@ const DEMO={live:false,
     {Name:"Example: Income sprint",Area:"Career",Score:38,Off:2,Goal:"Example: Income landed",Metrics:[{Name:"Example: applications per week",Status:"Off",Att:20,Val:1,Target:5,Trend:"▼"},{Name:"Example: conversations per week",Status:"At risk",Att:80,Val:4,Target:5,Trend:"▲"},{Name:"Example: interview loops",Status:"On track",Att:100,Val:2,Target:2,Trend:"▬"}]},
     {Name:"Example: Ship Gate",Area:"Telling",Score:100,Off:0,Metrics:[{Name:"Example: tells per week",Status:"On track",Att:100,Val:1,Target:1,Trend:"▬"}]},
     {Name:"Example: Revenue health",Area:"Revenue",Score:62,Off:1,Metrics:[{Name:"Example: proposals per week",Status:"At risk",Att:50,Val:1,Target:2,Trend:"▬"},{Name:"Example: pipeline value",Status:"On track",Att:100,Val:12,Target:10,Trend:"▲"}]}],
-  agents:[{Name:"Example: Scout",Class:"Bot",Platform:"Example cloud",Quota:62,Resets:new Date(Date.now()+5*36e5).toISOString(),Checked:new Date().toISOString()},{Name:"Example: Scribe",Class:"Bot",Platform:"Example cloud",Quota:62},{Name:"Example: Watchdog",Class:"Bot",Platform:"Example server"},{Name:"Example: Bookkeeper",Class:"Bot",Platform:"Example cloud",Quota:15,Resets:new Date(Date.now()+30*36e5).toISOString(),Checked:new Date().toISOString()}],
+  agents:[
+    ...["Scout","Scribe","Closer","Researcher","Editor"].map(n=>({Name:"Example: "+n,Class:"Bot",Platform:"Example: Cloud routines",Quota:62,Resets:new Date(Date.now()+5*36e5).toISOString(),Checked:new Date().toISOString()})),
+    ...["Watchdog","Backups","Deployer"].map(n=>({Name:"Example: "+n,Class:"Bot",Platform:"Example: Home server"})),
+    ...["Bookkeeper","Inbox Triage","Morning Brief","Coach"].map(n=>({Name:"Example: "+n,Class:"Bot",Platform:"Example: Chat bots",Quota:15,Resets:new Date(Date.now()+30*36e5).toISOString(),Checked:new Date().toISOString()})),
+    {Name:"Example: Retired - Old Digest",Class:"Bot",Platform:"Example: Home server",Status:"Zombie (retired, still firing)"}],
   agentTasks:[{Delegate:"Example: Scribe",Name:"Example: Draft the newsletter",Proj:"Example: Weekly newsletter"}],
-  runs:[{By:"Example: Scribe",Name:"Example run",Note:"Outlining three angles. Leaning on the reader question from last week.",Started:new Date().toISOString(),Proj:"Example: Weekly newsletter"}],
+  runs:[{By:"Example: Scribe",Name:"Example run",Note:"Outlining three angles. Leaning on the reader question from last week.",Started:new Date().toISOString(),Proj:"Example: Weekly newsletter"},{By:"Example: Scout",Name:"Example run",Note:"Found 4 new roles that match. Drafting two intro notes.",Started:new Date().toISOString(),Proj:"Example: Job search"}],
   ideas:[{Name:"Example: a game world for my agents"},{Name:"Example: a podcast"},{Name:"Example: a pottery class"}],doneWeek:3
 };
 
@@ -472,9 +476,10 @@ function quotaText(a){if(!a)return "quota not reported";const p=num(a.Quota);let
   if(a.Resets){const d=new Date(a.Resets),h=(d-Date.now())/36e5;t+=h>0?` · resets ${h<24?`in ${Math.max(1,Math.round(h))}h`:d.toLocaleDateString([],{timeZone:CONFIG_TZ(),month:"short",day:"numeric"})}`:" · reset passed";}
   if(p!=null&&a.Checked&&(Date.now()-new Date(a.Checked))>12*36e5)t+=" (stale)";return t;}
 function CONFIG_TZ(){return typeof CONFIG!=="undefined"?CONFIG.timeZone:CONFIG.timeZone;}
-function agentStatus(data){const ag={};(data.agents||[]).forEach(a=>{if(a.Class==="Human")return;ag[a.Name]={...a,Quota:a.Quota,working:null};});
-  (data.agentTasks||[]).forEach(t=>{if(!t.Delegate)return;const a=ag[t.Delegate]||(ag[t.Delegate]={Name:t.Delegate});a.working={task:t.Name,taskId:t.Id,project:t.Proj,thought:null};});
-  (data.runs||[]).forEach(r=>{if(!r.By)return;const fresh=!r.Started||(Date.now()-new Date(r.Started))<12*36e5;const a=ag[r.By]||(ag[r.By]={Name:r.By});
+function isGhost(a){return /^retired\b/i.test(String(a.Name||""))||/zombie|disabled|parked|down/i.test(String(a.Status||""));}
+function agentStatus(data){const ag={};(data.agents||[]).forEach(a=>{if(a.Class==="Human"||isGhost(a))return;ag[a.Name]={...a,Quota:a.Quota,working:null};});
+  (data.agentTasks||[]).forEach(t=>{if(!t.Delegate)return;const a=ag[t.Delegate];if(!a)return;a.working={task:t.Name,taskId:t.Id,project:t.Proj,thought:null};});
+  (data.runs||[]).forEach(r=>{if(!r.By)return;const fresh=!r.Started||(Date.now()-new Date(r.Started))<12*36e5;const a=ag[r.By];if(!a)return;
     if(fresh){a.working=a.working||{task:r.Task||r.Name,project:r.Proj||(a.Projects&&a.Projects[0]&&a.Projects[0].Name)||null};a.working.thought=a.working.thought||r.Note||r.Name;}
     else if(!a.working){a.handoff=r.Note||r.Name;}});
   return ag;}
@@ -488,14 +493,23 @@ function buildAgents(data){agentMeshes=[];const AG=agentStatus(data);const list=
     const nm=label(a.Name,{size:.42,font:"800 48px 'Bricolage Grotesque', sans-serif",bg:"rgba(42,183,169,.95)",ink:"#fff"});nm.position.set(x,(pos?.35:0)+2.75,z);world.add(nm);
     const th=bubble("💭 "+trunc(a.working.thought||("Working on: "+a.working.task),64));th.position.set(x,(pos?.35:0)+3.55,z);world.add(th);
     const it={mesh:g.children[0],pos:new THREE.Vector3(x,0,z),radius:1.8,kind:"agent",data:a};interactables.push(it);agentMeshes.push({a,th,x,z,y:(pos?.35:0)+3.55});});
-  /* agent lodge behind the throne: idle agents with their quota */
-  const n=idle.length;if(n){const rows=n>14?2:1,per=Math.ceil(n/rows);
-    const pad=new THREE.Mesh(new THREE.RingGeometry(17.5,25.5,48,1,Math.PI*1.08,Math.PI*.84),new THREE.MeshStandardMaterial({color:0xefe4f6,roughness:.9,side:THREE.DoubleSide}));pad.rotation.x=-Math.PI/2;pad.position.y=.03;pad.receiveShadow=true;world.add(pad);
-    const sg=label(`Agent Lodge · ${n} idle`,{size:1.1});sg.position.set(0,5.6,-21.5);world.add(sg);
-    idle.forEach((a,i)=>{const row=Math.floor(i/per),j=i%per;const ang=Math.PI*1.12+(per>1?j/(per-1):.5)*Math.PI*.76;const r=row?24:19.5;const x=Math.cos(ang)*r,z=Math.sin(ang)*r;
-      const col=[0x8a5cd6,0x3d86e0,0xd9826a,0xf2a93b,0x34d39a][hashN(a.Platform||a.Name)%5];const g=figure(col,.65);g.position.set(x,0,z);g.lookAt(0,0,0);world.add(g);
-      const q=quotaText(a);const lb=bubble(`${trunc(a.Name,22)} · ${q}`,{size:.36,bg:"rgba(255,250,240,.92)"});lb.position.set(x,2.2+(i%2)*.35,z);world.add(lb);
-      interactables.push({mesh:g.children[0],pos:new THREE.Vector3(x,0,z),radius:1.4,kind:"agent",data:a});});}
+  /* agent lodge behind the throne: idle agents grouped by platform, one quota sign per platform */
+  const n=idle.length;if(n){const groups={};idle.forEach(a=>{const k=a.Platform||"Other";(groups[k]=groups[k]||[]).push(a);});
+    const G2=Object.entries(groups).sort((x,y)=>y[1].length-x[1].length);
+    const pad=new THREE.Mesh(new THREE.RingGeometry(16.5,31,64,1,Math.PI*1.02,Math.PI*.96),new THREE.MeshStandardMaterial({color:0xefe4f6,roughness:.9,side:THREE.DoubleSide}));pad.rotation.x=-Math.PI/2;pad.position.y=.03;pad.receiveShadow=true;world.add(pad);
+    const sg=label(`Agent Lodge · ${n} idle · ${G2.length} platforms`,{size:1.1});sg.position.set(0,8.4,-15);world.add(sg);
+    const arcs=[{r:19,len:19*Math.PI*.9,used:0,items:[]},{r:26.5,len:26.5*Math.PI*.9,used:0,items:[]}];
+    G2.forEach(([plat,list])=>{const cols=Math.min(4,list.length),rowsG=Math.ceil(list.length/cols);const w=cols*1.35+2.2;const arc=arcs[0].used+w<=arcs[0].len||arcs[1].used+w>arcs[1].len?arcs[0]:arcs[1];arc.items.push({plat,list,cols,rowsG,w});arc.used+=w;});
+    arcs.forEach(arc=>{let cur=(arc.len-arc.used)/2;arc.items.forEach(gp=>{const mid=cur+gp.w/2;cur+=gp.w;const ang=Math.PI*1.05+mid/arc.r;
+      const cx=Math.cos(ang)*arc.r,cz=Math.sin(ang)*arc.r;const tx=-Math.sin(ang),tz=Math.cos(ang),rx=Math.cos(ang),rz=Math.sin(ang);
+      const col=[0x8a5cd6,0x3d86e0,0xd9826a,0xf2a93b,0x34d39a,0x2ab7a9,0xf25c54][hashN(gp.plat)%7];
+      const q=gp.list.find(a=>a.Quota!=null)||gp.list[0];const qt=quotaText(q);
+      const sign=label(`${trunc(gp.plat,26)} · ${gp.list.length} · ${qt}`,{size:.5,bg:"#"+new THREE.Color(col).getHexString(),ink:"#fff",font:"800 46px 'Bricolage Grotesque', sans-serif"});sign.position.set(cx+rx*((gp.rowsG-1)*.65),3.3+gp.rowsG*.15,cz+rz*((gp.rowsG-1)*.65));world.add(sign);
+      const rug=new THREE.Mesh(new THREE.CircleGeometry(Math.max(1.6,gp.w/2-.3),24),new THREE.MeshStandardMaterial({color:col,roughness:.9,transparent:true,opacity:.35}));rug.rotation.x=-Math.PI/2;rug.position.set(cx+rx*((gp.rowsG-1)*.65),.05,cz+rz*((gp.rowsG-1)*.65));world.add(rug);
+      gp.list.forEach((a,i)=>{const c=i%gp.cols,r=Math.floor(i/gp.cols);const off=(c-(gp.cols-1)/2)*1.35;const x=cx+tx*off+rx*r*1.3,z=cz+tz*off+rz*r*1.3;
+        const g=figure(col,.6);g.position.set(x,0,z);g.lookAt(0,0,0);world.add(g);
+        const lb=label(trunc(a.Name,18),{size:.28,bg:"rgba(255,250,240,.9)",font:"700 44px 'Atkinson Hyperlegible', sans-serif"});lb.position.set(x,1.85+(i%2)*.28,z);world.add(lb);
+        interactables.push({mesh:g.children[0],pos:new THREE.Vector3(x,0,z),radius:1.1,kind:"agent",data:a});});});});}
   const al=document.getElementById("agentsLine");if(al)al.textContent=`Agents: ${working.length} working · ${idle.length} idle in the Lodge`;
   /* fill thoughts from the latest comment on the task, where the backend can */
   agentMeshes.forEach(m=>{if(m.a.working&&m.a.working.taskId&&!m.a.working.fromRun&&typeof lastComment==="function"){lastComment(m.a.working.taskId).then(t=>{if(!t)return;m.a.working.thought=t;world.remove(m.th);const nb=bubble("💭 "+trunc(t,64));nb.position.set(m.x,m.y,m.z);world.add(nb);m.th=nb;}).catch(()=>{});}});
@@ -590,7 +604,7 @@ async function enterProject(p){let d=null;
 function leaveProject(){if(interior){scene.remove(interior.g);interior=null;}world.visible=true;interactables=savedInteract||interactables;mode=zoneArea?"area":"world";
   if(savedPos)player.position.copy(savedPos);current=null;if(zoneArea)enterArea(zoneArea);else{closeZone();camTween={yaw,pitch:VIEWS[1].pitch,dist:VIEWS[1].dist};}}
 
-try{if(/[?&]debug/.test(location.search))window.__hp={enterProject:(...x)=>enterProject(...x),enterArea:(...x)=>enterArea(...x),leaveProject:()=>leaveProject(),get state(){return state},get rooms(){return rooms}};}catch(e){}
+try{if(/[?&]debug/.test(location.search))window.__hp={enterProject:(...x)=>enterProject(...x),enterArea:(...x)=>enterArea(...x),leaveProject:()=>leaveProject(),get state(){return state},get rooms(){return rooms},tp:(x,z)=>{player.position.set(x,0,z);pup.position.set(x+1.5,0,z+1.5);travel=null;},go:(x,z)=>{travel={x,z};},cam:(y,p,d)=>{camTween={yaw:y,pitch:p,dist:d};},camNow:(y,p,d)=>{yaw=y;pitch=p;dist=d;camTween=null;},get focus(){return focusList}};}catch(e){}
 /* ---------- focus panel and guide trail ---------- */
 const trail=[];{const tm=new THREE.MeshStandardMaterial({color:0xffd36a,emissive:0xffb000,emissiveIntensity:.9});for(let i=0;i<28;i++){const d=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),tm);d.visible=false;scene.add(d);trail.push(d);}}
 function renderFocus(){const panel=document.getElementById("focusPanel"),ol=document.getElementById("focusList");if(!panel)return;
